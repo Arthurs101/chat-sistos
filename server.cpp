@@ -93,5 +93,68 @@ void *requestsHandler(void *params){
 int main(int argc, char const* argv[]){
     //verificar versiión de protobuf para evitar errores
     GOOGLE_PROTOBUF_VERIFY_VERSION;
-    return 0;
+    if (argc != 2){
+        fprintf(stderr, "NO PORT ENABLED: server <server port>\n");
+        return 1;
+    }
+    long port = strtol(argv[1], NULL, 10);
+    sockaddr_in server, incomminig_req;
+    socklen_t new_req_size;
+    int socket_fd, new_req_ip;
+    char incomminig_req_addr[INET_ADDRSTRLEN];
+    server.sin_family = AF_INET;
+    server.sin_port = htons(port);
+    server.sin_addr.s_addr = INADDR_ANY;
+    memset(server.sin_zero, 0, sizeof server.sin_zero);
+
+    // si hubo error al crear el socket para el cliente
+    if ((socket_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1){
+        fprintf(stderr, "ERROR: create socket\n");
+        return 1;
+    }
+
+    // si hubo error al crear el socket para el cliente y enlazar ip
+    if (bind(socket_fd, (struct sockaddr *)&server, sizeof(server)) == -1){
+        close(socket_fd);
+        fprintf(stderr, "ERROR: bind IP to socket.\n");
+        return 2;
+    }
+	
+    // si hubo error al crear el socket para esperar respuestas
+    if (listen(socket_fd, 5) == -1){
+        close(socket_fd);
+        fprintf(stderr, "ERROR: listen socket\n");
+        return 3;
+    }
+
+
+    // si no hubo errores se puede proceder con el listen del server
+    printf("SUCCESS: listening on port-> %ld\n", port);
+	
+    while (1){
+	    
+        // la funcion accept nos permite ver si se reciben o envian mensajes
+        new_req_size = sizeof incomminig_req;
+        new_req_ip = accept(socket_fd, (struct sockaddr *)&incomminig_req, &new_req_size);
+	    
+        // si hubo error al crear el socket para el cliente
+        if (new_req_ip == -1){
+            perror("ERROR: accept socket incomming connection\n");
+            continue;
+        }
+	    
+        //si falla el socket, un hilo se encargará del manejo de las requests del user
+        struct Cli newClient;
+        newClient.socket = new_req_ip;
+        inet_ntop(AF_INET, &(incomminig_req.sin_addr), newClient.ip, INET_ADDRSTRLEN);
+        pthread_t thread_id;
+        pthread_attr_t attrs;
+        pthread_attr_init(&attrs);
+        pthread_create(&thread_id, &attrs, requestsHandler, (void *)&newClient);
+    }
+	
+    // si hubo error al crear el socket para el cliente
+    google::protobuf::ShutdownProtobufLibrary();
+	return 0;
+
 }
