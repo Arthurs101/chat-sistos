@@ -20,7 +20,7 @@ struct Cli{
     int socket;
     string username;
     char ip[INET_ADDRSTRLEN]; //16 bits
-    int status;
+    string status;
 };
 
 //all the clients en un "diccionario"
