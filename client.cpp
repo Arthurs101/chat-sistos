@@ -50,7 +50,7 @@ void enviarMensaje(int sockfd, const string& mensaje, const string& destinatario
 }
 
 void chateoPrivado(int sockfd, const string& destinatario, const string& mensaje) {
-    chat::PrivateMessage private_msg;
+    chat::MessageCommunication private_msg;
     private_msg.set_recipient(destinatario);
     private_msg.set_message(mensaje);
     string private_msg_serialized;
@@ -93,11 +93,11 @@ void listarUsuarios(int sockfd) {
 }
 
 void obtenerInfoUsuario(int sockfd, const string& nombre_usuario) {
-    chat::UsersInfo usuarios_info;
-    usuarios_info.set_user(nombre_usuario);
+    chat::UserRequest *usuarios_info;
+    usuarios_info->set_user(nombre_usuario);
     chat::ClientPetition peticion;
     peticion.set_option(5); // Opción para obtener información de usuario en particular
-    *peticion.mutable_users() = usuarios_info;
+    peticion.set_allocated_users(usuarios_info);
     string peticion_serializada;
     if (!peticion.SerializeToString(&peticion_serializada)) {
         cerr << "Fallo al serializar la petición de información de usuario." << endl;
