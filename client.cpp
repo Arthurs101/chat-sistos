@@ -1,9 +1,9 @@
 #include <iostream>
+#include <string>
+#include <unistd.h>
+#include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include <string.h>
 #include <thread>
 #include "protocol.pb.h"
 
@@ -33,15 +33,30 @@ void recibirMensajes(int sockfd) {
     }
 }
 
+void enviarMensaje(int sockfd, const string& mensaje) {
+    chat::MessageCommunication mensaje_comunicacion;
+    mensaje_comunicacion.set_message(mensaje);
+    string mensaje_serializado;
+    if (!mensaje_comunicacion.SerializeToString(&mensaje_serializado)) {
+        cerr << "Fallo al serializar el mensaje." << endl;
+        return;
+    }
+
+    if (send(sockfd, mensaje_serializado.c_str(), mensaje_serializado.size(), 0) == -1) {
+        perror("send fallido");
+    }
+}
+
 int main(int argc, char const *argv[]) {
-    if (argc != 3) {
-        cerr << "Uso: " << argv[0] << " <ip_servidor> <puerto>" << endl;
+    if (argc != 4) {
+        cerr << "Uso: " << argv[0] << " <nombredeusuario> <IPdelservidor> <puertodelservidor>" << endl;
         return 1;
     }
 
     // Analizar los argumentos de la línea de comandos
-    const char* ip_servidor = argv[1];
-    int puerto = atoi(argv[2]);
+    string nombre_usuario = argv[1];
+    const char* ip_servidor = argv[2];
+    int puerto = atoi(argv[3]);
 
     // Crear socket
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -65,88 +80,61 @@ int main(int argc, char const *argv[]) {
         return 1;
     }
 
-    // Recibir mensaje de bienvenida
-    char buffer[8500];
-    int bytes_recibidos = recv(sockfd, buffer, sizeof(buffer), 0);
-    if (bytes_recibidos == -1) {
-        perror("recv fallido");
-        return 1;
-    } else if (bytes_recibidos == 0) {
-        cout << "El servidor se desconectó." << endl;
-        return 1;
-    } else {
-        // Parsear respuesta
-        chat::ServerResponse respuesta;
-        if (!respuesta.ParseFromString(buffer)) {
-            cerr << "Fallo al parsear la respuesta." << endl;
-            return 1;
-        }
+    // Iniciar hilo para recibir mensajes
+    thread recibir_thread(recibirMensajes, sockfd);
+    recibir_thread.detach();
 
-        // Mostrar mensaje de bienvenida
-        cout << "¡Bienvenido al servidor de chat!" << endl;
-        cout << "Mensaje del servidor: " << respuesta.servermessage() << endl;
-    }
-
-    // Registrarse en el servidor
-    cout << "Por favor ingrese su nombre de usuario: ";
-    string nombre_usuario;
-    cin >> nombre_usuario;
-    chat::ClientPetition solicitud;
-    solicitud.set_option(1); // Registro
-    solicitud.mutable_registration()->set_username(nombre_usuario);
-
-    // Serializar la solicitud
-    string solicitud_serializada;
-    if (!solicitud.SerializeToString(&solicitud_serializada)) {
-        cerr << "Fallo al serializar la solicitud." << endl;
+    // Enviar nombre de usuario al servidor
+    chat::Registration registro;
+    registro.set_username(nombre_usuario);
+    string registro_serializado;
+    if (!registro.SerializeToString(&registro_serializado)) {
+        cerr << "Fallo al serializar el registro." << endl;
+        close(sockfd);
         return 1;
     }
 
-    // Enviar solicitud de registro al servidor
-    if (send(sockfd, solicitud_serializada.c_str(), solicitud_serializada.size(), 0) == -1) {
-        perror("Fallo al enviar");
+    if (send(sockfd, registro_serializado.c_str(), registro_serializado.size(), 0) == -1) {
+        perror("send fallido");
+        close(sockfd);
         return 1;
     }
 
-    // Iniciar hilo para recibir mensajes del servidor
-    thread hilo_recv(recibirMensajes, sockfd);
-
-    // Bucle de chat
-    string mensaje;
-    cin.ignore(); // Limpiar el buffer de entrada
+    // Interacción con el usuario
+    string opcion;
     while (true) {
-        cout << "Ingrese un mensaje (escriba 'exit' para salir): ";
-        getline(cin, mensaje);
+        cout << "Seleccione una opción:" << endl;
+        cout << "1. Enviar mensaje" << endl;
+        cout << "2. Cambiar de status" << endl;
+        cout << "3. Listar usuarios conectados" << endl;
+        cout << "4. Obtener información de usuario en particular" << endl;
+        cout << "5. Ayuda" << endl;
+        cout << "6. Salir" << endl;
+        cin >> opcion;
 
-        // Comprobar si el usuario quiere salir
-        if (mensaje == "exit") {
+        if (opcion == "1") {
+            cout << "Ingrese el mensaje: ";
+            string mensaje;
+            cin.ignore(); // Ignorar el salto de línea anterior
+            getline(cin, mensaje);
+            enviarMensaje(sockfd, mensaje);
+        } else if (opcion == "2") {
+            // Implementar cambio de status
+        } else if (opcion == "3") {
+            // Implementar listar usuarios conectados
+        } else if (opcion == "4") {
+            // Implementar obtener información de usuario en particular
+        } else if (opcion == "5") {
+            // Implementar ayuda
+        } else if (opcion == "6") {
+            // Implementar salida
             break;
-        }
-
-        // Preparar el mensaje
-        chat::ClientPetition solicitud;
-        solicitud.set_option(4); // Mensaje
-        solicitud.mutable_messagecommunication()->set_sender(nombre_usuario);
-        solicitud.mutable_messagecommunication()->set_message(mensaje);
-
-        // Serializar la solicitud
-        string solicitud_serializada;
-        if (!solicitud.SerializeToString(&solicitud_serializada)) {
-            cerr << "Fallo al serializar la solicitud." << endl;
-            break;
-        }
-
-        // Enviar mensaje al servidor
-        if (send(sockfd, solicitud_serializada.c_str(), solicitud_serializada.size(), 0) == -1) {
-            perror("Fallo al enviar");
-            break;
+        } else {
+            cout << "Opción no válida." << endl;
         }
     }
 
-    // Unir el hilo de recepción
-    hilo_recv.join();
-
-    // Cerrar el socket
+    // Cerrar socket
     close(sockfd);
 
     return 0;
