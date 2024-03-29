@@ -22,7 +22,7 @@ void recibirMensajes(int sockfd) {
         } else {
             // Parsear respuesta
             chat::ServerResponse respuesta;
-            if (!respuesta.ParseFromString(buffer)) {
+            if (!respuesta.ParseFromArray(buffer, bytes_recibidos)) {
                 cerr << "Fallo al parsear la respuesta." << endl;
                 break;
             }
@@ -33,9 +33,11 @@ void recibirMensajes(int sockfd) {
     }
 }
 
-void enviarMensaje(int sockfd, const string& mensaje) {
+void enviarMensaje(int sockfd, const string& mensaje, const string& destinatario = "everyone", const string& remitente = "") {
     chat::MessageCommunication mensaje_comunicacion;
     mensaje_comunicacion.set_message(mensaje);
+    mensaje_comunicacion.set_recipient(destinatario);
+    mensaje_comunicacion.set_sender(remitente);
     string mensaje_serializado;
     if (!mensaje_comunicacion.SerializeToString(&mensaje_serializado)) {
         cerr << "Fallo al serializar el mensaje." << endl;
@@ -47,93 +49,131 @@ void enviarMensaje(int sockfd, const string& mensaje) {
     }
 }
 
+void chateoPrivado(int sockfd, const string& destinatario, const string& mensaje) {
+    chat::PrivateMessage private_msg;
+    private_msg.set_recipient(destinatario);
+    private_msg.set_message(mensaje);
+    string private_msg_serialized;
+    if (!private_msg.SerializeToString(&private_msg_serialized)) {
+        cerr << "Fallo al serializar el mensaje privado." << endl;
+        return;
+    }
+
+    if (send(sockfd, private_msg_serialized.c_str(), private_msg_serialized.size(), 0) == -1) {
+        perror("send fallido");
+    }
+}
+
+void cambiarEstado(int sockfd, const string& estado) {
+    chat::ChangeStatus cambio_estado;
+    cambio_estado.set_status(estado);
+    string cambio_estado_serializado;
+    if (!cambio_estado.SerializeToString(&cambio_estado_serializado)) {
+        cerr << "Fallo al serializar el cambio de estado." << endl;
+        return;
+    }
+
+    if (send(sockfd, cambio_estado_serializado.c_str(), cambio_estado_serializado.size(), 0) == -1) {
+        perror("send fallido");
+    }
+}
+
+void listarUsuarios(int sockfd) {
+    chat::ClientPetition peticion;
+    peticion.set_option(2); // Opción para listar usuarios conectados
+    string peticion_serializada;
+    if (!peticion.SerializeToString(&peticion_serializada)) {
+        cerr << "Fallo al serializar la petición de lista de usuarios." << endl;
+        return;
+    }
+
+    if (send(sockfd, peticion_serializada.c_str(), peticion_serializada.size(), 0) == -1) {
+        perror("send fallido");
+    }
+}
+
+void obtenerInfoUsuario(int sockfd, const string& nombre_usuario) {
+    chat::UsersInfo usuarios_info;
+    usuarios_info.set_user(nombre_usuario);
+    chat::ClientPetition peticion;
+    peticion.set_option(5); // Opción para obtener información de usuario en particular
+    *peticion.mutable_users() = usuarios_info;
+    string peticion_serializada;
+    if (!peticion.SerializeToString(&peticion_serializada)) {
+        cerr << "Fallo al serializar la petición de información de usuario." << endl;
+        return;
+    }
+
+    if (send(sockfd, peticion_serializada.c_str(), peticion_serializada.size(), 0) == -1) {
+        perror("send fallido");
+    }
+}
+
 int main(int argc, char const *argv[]) {
     if (argc != 4) {
         cerr << "Uso: " << argv[0] << " <nombredeusuario> <IPdelservidor> <puertodelservidor>" << endl;
         return 1;
     }
 
-    // Analizar los argumentos de la línea de comandos
     string nombre_usuario = argv[1];
-    const char* ip_servidor = argv[2];
-    int puerto = atoi(argv[3]);
+    string ip_servidor = argv[2];
+    int puerto_servidor = stoi(argv[3]);
 
-    // Crear socket
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd == -1) {
-        perror("Fallo al crear el socket");
+        perror("socket fallido");
         return 1;
     }
 
-    // Inicializar dirección del servidor
-    struct sockaddr_in servaddr;
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_port = htons(puerto);
-    if (inet_pton(AF_INET, ip_servidor, &servaddr.sin_addr) <= 0) {
-        perror("inet_pton fallido");
+    sockaddr_in server_addr;
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(puerto_servidor);
+    inet_pton(AF_INET, ip_servidor.c_str(), &server_addr.sin_addr);
+
+    if (connect(sockfd, (sockaddr*)&server_addr, sizeof(server_addr)) == -1) {
+        perror("connect fallido");
         return 1;
     }
 
-    // Conectar al servidor
-    if (connect(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr)) == -1) {
-        perror("Fallo al conectar");
-        return 1;
-    }
+    cout << "Conectado al servidor." << endl;
 
-    // Iniciar hilo para recibir mensajes
+    // Iniciar hilo para recibir mensajes del servidor
     thread recibir_thread(recibirMensajes, sockfd);
     recibir_thread.detach();
-
-    // Enviar nombre de usuario al servidor
-    chat::Registration registro;
-    registro.set_username(nombre_usuario);
-    string registro_serializado;
-    if (!registro.SerializeToString(&registro_serializado)) {
-        cerr << "Fallo al serializar el registro." << endl;
-        close(sockfd);
-        return 1;
-    }
-
-    if (send(sockfd, registro_serializado.c_str(), registro_serializado.size(), 0) == -1) {
-        perror("send fallido");
-        close(sockfd);
-        return 1;
-    }
 
     // Interacción con el usuario
     string opcion;
     while (true) {
         cout << "Seleccione una opción:" << endl;
         cout << "1. Enviar mensaje" << endl;
-        cout << "2. Cambiar de status" << endl;
-        cout << "3. Listar usuarios conectados" << endl;
-        cout << "4. Obtener información de usuario en particular" << endl;
-        cout << "5. Ayuda" << endl;
-        cout << "6. Salir" << endl;
+        cout << "2. Chatear privadamente" << endl;
+        cout << "3. Cambiar de estado" << endl;
+        cout << "4. Listar usuarios conectados" << endl;
+        cout << "5. Obtener información de usuario en particular" << endl;
+        cout << "6. Ayuda" << endl;
+        cout << "7. Salir" << endl;
         cin >> opcion;
 
         if (opcion == "1") {
-            cout << "Ingrese el mensaje: ";
-            string mensaje;
-            cin.ignore(); // Ignorar el salto de línea anterior
-            getline(cin, mensaje);
-            enviarMensaje(sockfd, mensaje);
+            // Código para enviar mensaje general
         } else if (opcion == "2") {
+            // Código para chatear privadamente
+        } else if (opcion == "3") {
             cout << "Seleccione un estado (ACTIVO, OCUPADO, INACTIVO): ";
             string estado;
             cin >> estado;
             cambiarEstado(sockfd, estado);
-        } else if (opcion == "3") {
-            listarUsuarios(sockfd);
         } else if (opcion == "4") {
+            listarUsuarios(sockfd);
+        } else if (opcion == "5") {
             cout << "Ingrese el nombre del usuario: ";
             string nombre_usuario;
             cin >> nombre_usuario;
             obtenerInfoUsuario(sockfd, nombre_usuario);
-        } else if (opcion == "5") {
+        } else if (opcion == "6") {
             // Implementar ayuda
             cout << "Ayuda no implementada." << endl;
-        } else if (opcion == "6") {
+        } else if (opcion == "7") {
             // Implementar salida
             break;
         } else {
