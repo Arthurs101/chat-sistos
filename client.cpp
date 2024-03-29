@@ -119,13 +119,20 @@ int main(int argc, char const *argv[]) {
             getline(cin, mensaje);
             enviarMensaje(sockfd, mensaje);
         } else if (opcion == "2") {
-            // Implementar cambio de status
+            cout << "Seleccione un estado (ACTIVO, OCUPADO, INACTIVO): ";
+            string estado;
+            cin >> estado;
+            cambiarEstado(sockfd, estado);
         } else if (opcion == "3") {
-            // Implementar listar usuarios conectados
+            listarUsuarios(sockfd);
         } else if (opcion == "4") {
-            // Implementar obtener información de usuario en particular
+            cout << "Ingrese el nombre del usuario: ";
+            string nombre_usuario;
+            cin >> nombre_usuario;
+            obtenerInfoUsuario(sockfd, nombre_usuario);
         } else if (opcion == "5") {
             // Implementar ayuda
+            cout << "Ayuda no implementada." << endl;
         } else if (opcion == "6") {
             // Implementar salida
             break;
