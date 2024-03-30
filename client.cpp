@@ -6,13 +6,15 @@
 #include <arpa/inet.h>
 #include <thread>
 #include "protocol.pb.h"
+// to compile:
+// g++ client.cpp protocol.pb.cc -o clientx -lprotobuf -lpthread
 
 using namespace std;
 
 void recibirMensajes(int sockfd) {
     while (true) {
         char buffer[8192];
-        int bytes_recibidos = recv(sockfd, buffer, sizeof(buffer), 0);
+        int bytes_recibidos = recv(sockfd, buffer, 8192, 0);
         if (bytes_recibidos == -1) {
             perror("recv fallido");
             break;
@@ -21,32 +23,46 @@ void recibirMensajes(int sockfd) {
             break;
         } else {
             // Parsear respuesta
-            chat::ServerResponse respuesta;
-            if (!respuesta.ParseFromArray(buffer, bytes_recibidos)) {
-                cerr << "Fallo al parsear la respuesta." << endl;
+            chat::ServerResponse *respuesta=new chat::ServerResponse();
+            if (!respuesta->ParseFromString(buffer)) {
+                cerr << "Fallo al parsear la respuesta.\n aborting" << endl;
                 break;
             }
-
             // Mostrar mensaje recibido
-            cout << "Mensaje del servidor: " << respuesta.servermessage() << endl;
+            cout <<"-------------------INCOMMING TRANSMISSION-------------------" << endl;
+            cout << "Mensaje del servidor: " << respuesta->servermessage() << endl;
+            cout<<respuesta->messagecommunication().sender() << ":\n"<< respuesta->messagecommunication().message() << endl;
+            cout <<"------------------- END OF TRANSMISSION -------------------" << endl;
         }
     }
 }
 
-void enviarMensaje(int sockfd, const string& mensaje, const string& destinatario = "everyone", const string& remitente = "") {
-    chat::MessageCommunication mensaje_comunicacion;
-    mensaje_comunicacion.set_message(mensaje);
-    mensaje_comunicacion.set_recipient(destinatario);
-    mensaje_comunicacion.set_sender(remitente);
-    string mensaje_serializado;
-    if (!mensaje_comunicacion.SerializeToString(&mensaje_serializado)) {
+void enviarMensaje(int sockfd, const string& mensaje, const string& remitente = "",const string& destinatario = "everyone") {
+    char buffer[8192];
+    chat::ClientPetition *request = new chat::ClientPetition();
+    chat::MessageCommunication *mensaje_comunicacion = new chat::MessageCommunication();
+    mensaje_comunicacion->set_message(mensaje);
+    mensaje_comunicacion->set_recipient(destinatario);
+    mensaje_comunicacion->set_sender(remitente);
+    request->set_option(4);
+    request->set_allocated_messagecommunication(mensaje_comunicacion);
+    std::string mensaje_serializado;
+    if(!request->SerializeToString(&mensaje_serializado)){
         cerr << "Fallo al serializar el mensaje." << endl;
         return;
-    }
+    };
+	strcpy(buffer, mensaje_serializado.c_str());
+	send(sockfd, buffer, mensaje_serializado.size() + 1, 0);
+	recv(sockfd, buffer, 8192, 0);
 
-    if (send(sockfd, mensaje_serializado.c_str(), mensaje_serializado.size(), 0) == -1) {
-        perror("send fallido");
-    }
+    chat::ServerResponse *response = new chat::ServerResponse();
+	response->ParseFromString(buffer);
+	
+	// si hubo error al buscar 
+	if (response->code() != 200) {
+		std::cout << response->servermessage()<< std::endl;
+		return;
+	}
 }
 
 void chateoPrivado(int sockfd, const string& destinatario, const string& mensaje) {
@@ -86,7 +102,7 @@ void listarUsuarios(int sockfd) {
         cerr << "Fallo al serializar la petición de lista de usuarios." << endl;
         return;
     }
-
+    
     if (send(sockfd, peticion_serializada.c_str(), peticion_serializada.size(), 0) == -1) {
         perror("send fallido");
     }
@@ -178,6 +194,10 @@ int main(int argc, char const *argv[]) {
         cin >> opcion;
 
         if (opcion == "1") {
+            string message;
+            cout << "Ingresa tu mensaje:"<<endl;
+            cin>>message;
+            enviarMensaje(sockfd,message,nombre_usuario);
             // Código para enviar mensaje general
         } else if (opcion == "2") {
             // Código para chatear privadamente

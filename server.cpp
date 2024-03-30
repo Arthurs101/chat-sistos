@@ -14,6 +14,8 @@
 #include <semaphore.h>
 #include "protocol.pb.h"
 using namespace std;
+// to compile:
+// g++ server.cpp protocol.pb.cc -o serverx -lprotobuf -lpthread
 
 //estructura para modelar al cliente y facilitar el manejo de su información
 struct Cli{
@@ -143,12 +145,13 @@ void *requestsHandler(void *params){
 				break;
 			}
 			case 4:{ //enviar mensaje
-                if(!request->messagecommunication().has_recipient()){ //a chat global
+                if(!request->messagecommunication().has_recipient()||request->messagecommunication().recipient()=="everyone"){ //a chat global
                     std::cout<<"\n__SENDING GENERAL MESSAGE__\nUser: "<<request->messagecommunication().sender()<<" is trying to send a general message";
                     for (auto i:servingCLients){
                         if (i.first==request->messagecommunication().sender()){
                             chat::MessageCommunication *response_message = new chat::MessageCommunication();
-                            response_message->set_message("");
+                            response_message->set_sender("you:");
+                            response_message->set_message(request->messagecommunication().message());
                             response->set_allocated_messagecommunication(response_message);
                             response->set_servermessage("SUCCESS: general chat");
                             response->set_code(200);
@@ -163,7 +166,7 @@ void *requestsHandler(void *params){
                             message->set_sender(client.username);
                             message->set_message(request->messagecommunication().message());
                             response->set_allocated_messagecommunication(message);
-                            response->set_servermessage("\nUser: "+request->messagecommunication().sender()+" sends you a message\n");
+                            response->set_servermessage("\nUser: "+request->messagecommunication().sender()+" to global");
                             response->set_code(200);
                             response->set_option(4);
                             response->SerializeToString(&msgServer);
