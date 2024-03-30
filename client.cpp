@@ -65,64 +65,118 @@ void enviarMensaje(int sockfd, const string& mensaje, const string& remitente = 
 	}
 }
 
-void chateoPrivado(int sockfd, const string& destinatario, const string& mensaje) {
-    chat::MessageCommunication private_msg;
-    private_msg.set_recipient(destinatario);
-    private_msg.set_message(mensaje);
-    string private_msg_serialized;
-    if (!private_msg.SerializeToString(&private_msg_serialized)) {
-        cerr << "Fallo al serializar el mensaje privado." << endl;
+void chateoPrivado(int sockfd, const string& destinatario,const string& remitente,const string& mensaje) {
+    char buffer[8192];
+    chat::ClientPetition *request = new chat::ClientPetition();
+    chat::MessageCommunication *mensaje_comunicacion = new chat::MessageCommunication();
+    mensaje_comunicacion->set_message(mensaje);
+    mensaje_comunicacion->set_recipient(destinatario);
+    mensaje_comunicacion->set_sender(remitente);
+    request->set_option(4);
+    request->set_allocated_messagecommunication(mensaje_comunicacion);
+    std::string mensaje_serializado;
+    if(!request->SerializeToString(&mensaje_serializado)){
+        cerr << "Fallo al serializar el mensaje." << endl;
         return;
-    }
+    };
+	strcpy(buffer, mensaje_serializado.c_str());
+	send(sockfd, buffer, mensaje_serializado.size() + 1, 0);
+	recv(sockfd, buffer, 8192, 0);
 
-    if (send(sockfd, private_msg_serialized.c_str(), private_msg_serialized.size(), 0) == -1) {
-        perror("send fallido");
-    }
+    chat::ServerResponse *response = new chat::ServerResponse();
+	response->ParseFromString(buffer);
+	
+	// si hubo error al buscar 
+	if (response->code() != 200) {
+		std::cout << response->servermessage()<< std::endl;
+		return;
+	}
 }
 
 void cambiarEstado(int sockfd, const string& estado) {
-    chat::ChangeStatus cambio_estado;
-    cambio_estado.set_status(estado);
+    char buffer[8192];
+    chat::ClientPetition *request = new chat::ClientPetition();
+    chat::ChangeStatus *cambio_estado = new chat::ChangeStatus;
+    cambio_estado->set_status(estado);
+    request->set_option(3);
+    request->set_allocated_change(cambio_estado);
+
     string cambio_estado_serializado;
-    if (!cambio_estado.SerializeToString(&cambio_estado_serializado)) {
+    if (!request->SerializeToString(&cambio_estado_serializado)) {
         cerr << "Fallo al serializar el cambio de estado." << endl;
         return;
     }
-
-    if (send(sockfd, cambio_estado_serializado.c_str(), cambio_estado_serializado.size(), 0) == -1) {
+    strcpy(buffer, cambio_estado_serializado.c_str());
+    if (send(sockfd, buffer, cambio_estado_serializado.size()+1, 0) == -1) {
         perror("send fallido");
     }
+    	recv(sockfd, buffer, 8192, 0);
+
+    chat::ServerResponse *response = new chat::ServerResponse();
+	response->ParseFromString(buffer);
+	
+	// si hubo error al buscar 
+	if (response->code() != 200) {
+		std::cout << response->servermessage()<< std::endl;
+		return;
+	}
+    cout<<response->servermessage()<<endl;
 }
 
 void listarUsuarios(int sockfd) {
-    chat::ClientPetition peticion;
-    peticion.set_option(2); // Opción para listar usuarios conectados
+    char buffer[8192];
+    chat::ClientPetition *peticion = new chat::ClientPetition();
+    peticion->set_option(2); // Opción para listar usuarios conectados
     string peticion_serializada;
-    if (!peticion.SerializeToString(&peticion_serializada)) {
+    if (!peticion->SerializeToString(&peticion_serializada)) {
         cerr << "Fallo al serializar la petición de lista de usuarios." << endl;
         return;
     }
-    
-    if (send(sockfd, peticion_serializada.c_str(), peticion_serializada.size(), 0) == -1) {
-        perror("send fallido");
+    strcpy(buffer, peticion_serializada.c_str());
+	if(!send(sockfd, buffer, peticion_serializada.size() + 1, 0)){perror("send fallido");};
+	recv(sockfd, buffer, 8192, 0);
+    chat::ServerResponse *response = new chat::ServerResponse();
+	response->ParseFromString(buffer);
+	
+	// si hubo error al buscar 
+	if (response->code() != 200) {
+		std::cout << response->servermessage()<< std::endl;
+		return;
+	}
+    cout<<"---------------Retriieved Users:---------------"<<endl;
+    for (int i = 0; i < response->connectedusers().connectedusers_size(); ++i) {
+        auto user = response->connectedusers().connectedusers(i);
+        cout<< "User: " << user.username()<<endl;
     }
+    cout <<"-----------------------------------------------"<<endl ;
+
 }
 
 void obtenerInfoUsuario(int sockfd, const string& nombre_usuario) {
-    chat::UserRequest *usuarios_info;
-    usuarios_info->set_user(nombre_usuario);
-    chat::ClientPetition peticion;
-    peticion.set_option(5); // Opción para obtener información de usuario en particular
-    peticion.set_allocated_users(usuarios_info);
+   char buffer[8192];
+    chat::ClientPetition *peticion = new chat::ClientPetition();
     string peticion_serializada;
-    if (!peticion.SerializeToString(&peticion_serializada)) {
-        cerr << "Fallo al serializar la petición de información de usuario." << endl;
+    chat::UserRequest *user_req = new chat::UserRequest();
+    user_req->set_user(nombre_usuario);
+    peticion->set_option(5); // Opción para listar usuarios conectados
+    peticion->set_allocated_users(user_req);
+    if (!peticion->SerializeToString(&peticion_serializada)) {
+        cerr << "Fallo al serializar la petición de usuario en específico." << endl;
         return;
     }
-
-    if (send(sockfd, peticion_serializada.c_str(), peticion_serializada.size(), 0) == -1) {
-        perror("send fallido");
+    strcpy(buffer, peticion_serializada.c_str());
+    if(!send(sockfd, buffer, peticion_serializada.size() + 1, 0)){perror("send fallido");};
+	chat::ServerResponse *response = new chat::ServerResponse();
+    recv(sockfd, buffer, 8192, 0);
+    if(!response->ParseFromString(buffer)){perror("failed to parse response");};
+    if (response->code() != 200) {
+		std::cout << response->servermessage()<< std::endl;
+	}else{
+        cout<<"---------------Retriieved User Info:---------------"<<endl;
+        cout<<"USER: "<<response->userinforesponse().username()<<"\nSTATUS: "<<response->userinforesponse().status()<<"\nIP: "<<response->userinforesponse().ip()<<endl;
+        cout<<"---------------END OF RETRIEVED---------------"<<endl;
     }
+    
 }
 
 int main(int argc, char const *argv[]) {
@@ -201,6 +255,13 @@ int main(int argc, char const *argv[]) {
             // Código para enviar mensaje general
         } else if (opcion == "2") {
             // Código para chatear privadamente
+            string destin;
+            cout<<"Ingresa Username a enviar mensaje"<<endl;
+            cin>>destin;
+            string message;
+            cout << "Ingresa tu mensaje:"<<endl;
+            cin>>message;
+            chateoPrivado(sockfd,destin,nombre_usuario,message);
         } else if (opcion == "3") {
             cout << "Seleccione un estado (ACTIVO, OCUPADO, INACTIVO): ";
             string estado;
