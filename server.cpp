@@ -64,7 +64,8 @@ void *requestsHandler(void *params){
         response->Clear(); //limpiar la response enviada
         int bytes_received = recv(socket, buffer, 8192, 0);
         if(bytes_received<=0){
-            cout<<"User: " << client.username << "lost connection or logged out" << endl;
+            servingCLients.erase(client.username);
+            cout<<"User: " << client.username << "lost connection or logged out, removed from session" << endl;
             break;
         };
         if (!request->ParseFromString(buffer)) {
