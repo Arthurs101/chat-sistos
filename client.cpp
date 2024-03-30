@@ -11,7 +11,7 @@ using namespace std;
 
 void recibirMensajes(int sockfd) {
     while (true) {
-        char buffer[8500];
+        char buffer[8192];
         int bytes_recibidos = recv(sockfd, buffer, sizeof(buffer), 0);
         if (bytes_recibidos == -1) {
             perror("recv fallido");
@@ -135,8 +135,31 @@ int main(int argc, char const *argv[]) {
         return 1;
     }
 
-    cout << "Conectado al servidor." << endl;
+    std::string message_serialized;
+    chat::ClientPetition *request = new chat::ClientPetition();
+    chat::ServerResponse *response = new chat::ServerResponse();
+    chat::UserRegistration *new_user = new chat::UserRegistration();
 
+    new_user->set_ip("10.0.2.15");
+    new_user->set_username(nombre_usuario);
+    request->set_option(1);
+    request->set_allocated_registration(new_user);
+    char buffer[8192];
+
+    request->SerializeToString(&message_serialized);
+	strcpy(buffer, message_serialized.c_str());
+	send(sockfd, buffer, message_serialized.size() + 1, 0);
+	recv(sockfd, buffer, 8192, 0);
+	response->ParseFromString(buffer);
+	
+	// si hubo error al buscar 
+	if (response->code() != 200) {
+		std::cout << response->servermessage()<< std::endl;
+		return 0;
+	}
+    std::cout << "SERVER: "<< response->servermessage()<< std::endl;
+    cout << "Conectado al servidor." << endl;
+    
     // Iniciar hilo para recibir mensajes del servidor
     thread recibir_thread(recibirMensajes, sockfd);
     recibir_thread.detach();

@@ -53,7 +53,7 @@ void *requestsHandler(void *params){
     struct Cli client;
     struct Cli *newClient = (struct Cli *)params; 
     int socket = newClient->socket; 
-    char buffer[8500];
+    char buffer[8192];
 
     // Server Structs
     string msgServer;
@@ -62,7 +62,17 @@ void *requestsHandler(void *params){
     while(1){
         //this will done forever
         response->Clear(); //limpiar la response enviada
-        request->ParseFromString(buffer); //obtener la request actual
+        int bytes_received = recv(socket, buffer, 8192, 0);
+        if(bytes_received<=0){
+            cout<<"User: " << client.username << "lost connection or logged out" << endl;
+            break;
+        };
+        if (!request->ParseFromString(buffer)) {
+            cout<<"failed to parse"<< endl;
+            break;
+        }else{
+            cout<<"option received:" << request->option() << endl;
+        }
         switch (request->option()){
 			case 1:{ //registrar un nuevo usuario en el servidor
 				std::cout<<std::endl<<"__RECEIVED INFO__\nUsername: "<<request->registration().username()<<"		ip: "<<request->registration().ip();
@@ -96,7 +106,7 @@ void *requestsHandler(void *params){
                         user_in_pos->set_ip(i.second->ip);
                         users->add_connectedusers()->CopyFrom(*user_in_pos);
                     }
-                    response->set_servermessage("SUCCESS: userinfo of all connected clients");
+                    response->set_servermessage("info of all connected clients");
                     response->set_allocated_connectedusers(users);
                     response->set_option(2);
                     response->set_code(200);
@@ -106,19 +116,20 @@ void *requestsHandler(void *params){
                     std::cout<<"User:"<<client.username<<"requested all conected";
                 }
                 else{
-                    ErrorResponse(2,socket,"ERROR: can't specify a user when asking all");                
+                    ErrorResponse(2,socket,"ERROR: can't specify a user when asking all");    
+                    std::cout<<"E: User:"<<client.username<<"requested all with wrong args";            
                 }
 				break;
 			}
 			case 3:{ //change status
                 try{
                 servingCLients[request->change().username()]->status = request->change().status();
-                std::cout<<"\n__USER CHANGE STATUS SOLICITUDE__\nUser: "<<client.username<<" requested to change status.\nSUCCESS:status has changed successfully\n";
+                std::cout<<"User: "<<client.username<<" status has changed successfully\n";
                 chat::ChangeStatus *sStatus = new chat::ChangeStatus();
                 sStatus->set_username(request->change().username());
                 sStatus->set_status(request->change().status());
                 response->set_allocated_change(sStatus);
-                response->set_servermessage("\nSUCCESS:\nUser: "+request->change().username()+" has changed status successfully\n");
+                response->set_servermessage("status changed");
                 response->set_code(200);
                 response->set_option(3);
                 response->SerializeToString(&msgServer);
@@ -126,7 +137,7 @@ void *requestsHandler(void *params){
                 send(socket, buffer, msgServer.size() + 1, 0);
                 }
                 catch(exception &e){
-                    ErrorResponse(3,socket,"Change status on: " + request->change().username() + "doesn't exist");
+                    ErrorResponse(3,socket,"User:" + request->change().username() + "doesn't exist");
                 }
 				break;
 			}
@@ -138,13 +149,13 @@ void *requestsHandler(void *params){
                             chat::MessageCommunication *response_message = new chat::MessageCommunication();
                             response_message->set_message("");
                             response->set_allocated_messagecommunication(response_message);
-                            response->set_servermessage("\nSUCCESS: general chat\n");
+                            response->set_servermessage("SUCCESS: general chat");
                             response->set_code(200);
                             response->set_option(4);
                             response->SerializeToString(&msgServer);
                             strcpy(buffer, msgServer.c_str());
                             send(socket, buffer, msgServer.size() + 1, 0);
-                            std::cout<<"\nSUCCESS:User: "+request->messagecommunication().sender()+" has sent the message successfully to the general chat\n";
+                            std::cout<<"\nSUCCESS: User: "+request->messagecommunication().sender()+" sent chat to general\n";
                         }
                         else{ 
                             chat::MessageCommunication *message = new chat::MessageCommunication();
@@ -225,6 +236,7 @@ void *requestsHandler(void *params){
 			}
         }
     }
+    return nullptr;
 }
 
 int main(int argc, char const* argv[]){
@@ -279,6 +291,8 @@ int main(int argc, char const* argv[]){
             perror("ERROR: accept socket incomming connection\n");
             continue;
         }
+        
+        
 	    
         //si falla el socket, un hilo se encargará del manejo de las requests del user
         struct Cli newClient;
