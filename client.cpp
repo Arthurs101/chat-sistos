@@ -93,10 +93,11 @@ void chateoPrivado(int sockfd, const string& destinatario,const string& remitent
 	}
 }
 
-void cambiarEstado(int sockfd, const string& estado) {
+void cambiarEstado(int sockfd, const string& username, const string& estado) {
     char buffer[8192];
     chat::ClientPetition *request = new chat::ClientPetition();
     chat::ChangeStatus *cambio_estado = new chat::ChangeStatus;
+    cambio_estado->set_username(username);
     cambio_estado->set_status(estado);
     request->set_option(3);
     request->set_allocated_change(cambio_estado);
@@ -266,7 +267,7 @@ int main(int argc, char const *argv[]) {
             cout << "Seleccione un estado (ACTIVO, OCUPADO, INACTIVO): ";
             string estado;
             cin >> estado;
-            cambiarEstado(sockfd, estado);
+            cambiarEstado(sockfd, nombre_usuario,estado);
         } else if (opcion == "4") {
             listarUsuarios(sockfd);
         } else if (opcion == "5") {
