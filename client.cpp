@@ -167,17 +167,6 @@ void cambiarEstado(int sockfd, const string& username, const string& estado) {
     if (send(sockfd, buffer, cambio_estado_serializado.size()+1, 0) == -1) {
         perror("send fallido");
     }
-    	recv(sockfd, buffer, 8192, 0);
-
-    chat::ServerResponse *response = new chat::ServerResponse();
-	response->ParseFromString(buffer);
-	
-	// si hubo error al buscar 
-	if (response->code() != 200) {
-		std::cout << response->servermessage()<< std::endl;
-		return;
-	}
-    cout<<response->servermessage()<<endl;
 }
 
 void listarUsuarios(int sockfd) {
