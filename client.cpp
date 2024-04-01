@@ -17,20 +17,22 @@ string nombre_usuario;
 void recibirMensajes() {
     while (true) {
         char buffer[8192];
-        int bytes_recibidos = recv(sockfd, buffer, 8192, 0);
+        int bytes_recibidos = recv(sockfd, buffer, sizeof(buffer), 0);
         if (bytes_recibidos == -1) {
             perror("recv fallido");
-            break;
+            close(sockfd);
+            exit(EXIT_FAILURE);
         } else if (bytes_recibidos == 0) {
             cout << "El servidor se desconectó." << endl;
             close(sockfd);
-            exit(1);
+            exit(EXIT_SUCCESS);
         } else {
             // Parsear respuesta
             chat::ServerResponse respuesta;
-            if (!respuesta.ParseFromString(buffer)) {
+            if (!respuesta.ParseFromArray(buffer, bytes_recibidos)) {
                 cerr << "Fallo al parsear la respuesta.\n aborting" << endl;
-                break;
+                close(sockfd);
+                exit(EXIT_FAILURE);
             }
             // Mostrar mensaje recibido
             cout <<"-------------------INCOMMING TRANSMISSION-------------------" << endl;
@@ -102,7 +104,7 @@ void listarUsuarios() {
     }
 
     chat::ServerResponse response;
-    int bytes_recibidos = recv(sockfd, buffer, 8192, 0);
+    int bytes_recibidos = recv(sockfd, buffer, sizeof(buffer), 0);
     if (bytes_recibidos == -1) {
         perror("recv fallido");
         return;
@@ -143,7 +145,7 @@ void obtenerInfoUsuario(const string& nombre_usuario) {
     }
 
     chat::ServerResponse response;
-    int bytes_recibidos = recv(sockfd, buffer, 8192, 0);
+    int bytes_recibidos = recv(sockfd, buffer, sizeof(buffer), 0);
     if (bytes_recibidos == -1) {
         perror("recv fallido");
         return;
@@ -200,7 +202,7 @@ void manejarEntradaUsuario() {
         } else if (opcion == "5") {
             cout << "Saliendo del chat." << endl;
             close(sockfd);
-            exit(0);
+            exit(EXIT_SUCCESS);
         } else {
             cout << "Opción no válida." << endl;
         }
@@ -210,17 +212,24 @@ void manejarEntradaUsuario() {
 int main(int argc, char const *argv[]) {
     if (argc != 4) {
         cerr << "Uso: " << argv[0] << " <nombredeusuario> <IPdelservidor> <puertodelservidor>" << endl;
-        return 1;
+        return EXIT_FAILURE;
     }
 
     nombre_usuario = argv[1];
     string ip_servidor = argv[2];
     int puerto_servidor = stoi(argv[3]);
 
+    // Validación de la dirección IP del servidor
+    struct sockaddr_in sa;
+    if (inet_pton(AF_INET, ip_servidor.c_str(), &(sa.sin_addr)) == 0) {
+        cerr << "Dirección IP del servidor inválida." << endl;
+        return EXIT_FAILURE;
+    }
+
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd == -1) {
         perror("socket fallido");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     sockaddr_in server_addr;
@@ -230,12 +239,12 @@ int main(int argc, char const *argv[]) {
 
     if (connect(sockfd, (sockaddr*)&server_addr, sizeof(server_addr)) == -1) {
         perror("connect fallido");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     // Registrar al usuario con el servidor
     chat::UserRegistration new_user;
-    new_user.set_ip("10.0.2.15");
+    new_user.set_ip("10.0.2.15"); // OJO: Aquí podría obtenerse la IP real del cliente
     new_user.set_username(nombre_usuario);
 
     chat::ClientPetition request;
@@ -246,7 +255,7 @@ int main(int argc, char const *argv[]) {
     if (!request.SerializeToString(&mensaje_serializado)) {
         cerr << "Fallo al serializar el registro del usuario." << endl;
         close(sockfd);
-        return 1;
+        return EXIT_FAILURE;
     }
 
     char buffer[8192];
@@ -260,5 +269,5 @@ int main(int argc, char const *argv[]) {
     // Manejar la entrada del usuario
     manejarEntradaUsuario();
 
-    return 0;
+    return EXIT_SUCCESS;
 }
