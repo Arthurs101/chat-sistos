@@ -253,9 +253,9 @@ int main(int argc, char const *argv[]) {
             cout << "Ingresa tu mensaje:"<<endl;
             cin>>message;
             enviarMensaje(sockfd,message,nombre_usuario);
-            // Código para enviar mensaje general
+            // Enviar mensaje general
         } else if (opcion == "2") {
-            // Código para chatear privadamente
+            // Chatear privadamente
             string destin;
             cout<<"Ingresa Username a enviar mensaje"<<endl;
             cin>>destin;
@@ -264,13 +264,16 @@ int main(int argc, char const *argv[]) {
             cin>>message;
             chateoPrivado(sockfd,destin,nombre_usuario,message);
         } else if (opcion == "3") {
+            // Cambiar de estado
             cout << "Seleccione un estado (ACTIVO, OCUPADO, INACTIVO): ";
             string estado;
             cin >> estado;
             cambiarEstado(sockfd, nombre_usuario,estado);
         } else if (opcion == "4") {
+            // Listar usuarios conectados
             listarUsuarios(sockfd);
         } else if (opcion == "5") {
+            // Información de usuario en particular
             cout << "Ingrese el nombre del usuario: ";
             string nombre_usuario;
             cin >> nombre_usuario;
