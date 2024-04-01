@@ -40,14 +40,16 @@ unordered_map<string,Cli*> servingCLients;
  * >5: Informacion de un usuario en particular
 */
 void ErrorResponse(int optionHandled , int socketID , string errorMessage){
+    char buff[8192];
     chat::ServerResponse *errorRes = new chat::ServerResponse();
+    string msSerialized;
     errorRes->set_option(optionHandled);
     errorRes->set_code(500);
     errorRes->set_servermessage(errorMessage);
     //calcular tamaño del buffer a emplear
-    char buff[errorMessage.size() +1 ];
-    strcpy(buff, errorMessage.c_str());
-    send(socketID, buff, sizeof buff, 0); 
+    errorRes->SerializeToString(&msSerialized);
+    strcpy(buff, msSerialized.c_str());
+    if(!send(socketID, buff, msSerialized.size() + 1, 0)){cout<<"E: HANDLER FAILED"<<endl;};
 }
 
 //función para el manejo de requests
@@ -94,7 +96,7 @@ void *requestsHandler(void *params){
 				std::cout<<std::endl<<"SUCCESS:The user"<<client.username<<" was added with the socket: "<<socket<<std::endl;
 				client.username = request->registration().username();
 				client.socket = socket;
-				client.status = 1;
+				client.status = "activo";
 				strcpy(client.ip, newClient->ip);
 				servingCLients[client.username] = &client;
 				break;
@@ -212,7 +214,7 @@ void *requestsHandler(void *params){
 			}
 			case 5:{ //obtener usuario en específico
 				chat::UserInfo *userI = new chat::UserInfo();
-                try{
+                if (servingCLients.find(request->users().user()) != servingCLients.end()){
                     //intentar obtener dicho valor con la llave (username)
                     userI->set_username(servingCLients[request->users().user()]->username);                    
                     userI->set_ip(servingCLients[request->users().user()]->ip);
@@ -226,9 +228,9 @@ void *requestsHandler(void *params){
                     send(socket, buffer, msgServer.size() + 1, 0);
                     std::cout<<"\n__USER INFO SOLICITUDE__\nUser: "<<client.username<<" requested info of ->"<<request->users().user()<<"\nSUCCESS: userinfo of "<<request->users().user()<<std::endl;
                 }
-                catch(const std::exception& e){ //no existe el usuario
+                else{ //no existe el usuario
                     response->set_servermessage("ERROR: "+request->users().user() + "doesn't exists");
-                    response->set_code(400);
+                    response->set_code(500);
                     response->SerializeToString(&msgServer);
                     strcpy(buffer, msgServer.c_str());
                     send(socket, buffer, msgServer.size() + 1, 0);
