@@ -229,11 +229,7 @@ void *requestsHandler(void *params){
                     std::cout<<"\n__USER INFO SOLICITUDE__\nUser: "<<client.username<<" requested info of ->"<<request->users().user()<<"\nSUCCESS: userinfo of "<<request->users().user()<<std::endl;
                 }
                 else{ //no existe el usuario
-                    response->set_servermessage("ERROR: "+request->users().user() + "doesn't exists");
-                    response->set_code(500);
-                    response->SerializeToString(&msgServer);
-                    strcpy(buffer, msgServer.c_str());
-                    send(socket, buffer, msgServer.size() + 1, 0);
+                    ErrorResponse(5,socket,"ERROR: user doesn'e exist");
                     std::cout<<"\n__USER INFO SOLICITUDE__\nUser: "<<client.username<<" requested info of ->"<<request->users().user()<<"\nERROR: userinfo of "<<request->users().user()<<std::endl;
                 }
 			}

@@ -11,6 +11,7 @@
 
 using namespace std;
 std::unordered_map<string,thread> privates;
+
 void listenPrivateMessages(int sockfd,string username){
     while (true)
     {
@@ -39,7 +40,7 @@ void listenPrivateMessages(int sockfd,string username){
     }
     
 }
-
+void listenResponses(int sockfd){
     while (true) {
         char buffer[8192];
         int bytes_recibidos = recv(sockfd, buffer, 8192, 0);
