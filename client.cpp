@@ -296,7 +296,42 @@ int main(int argc, char const *argv[]) {
             obtenerInfoUsuario(sockfd, nombre_usuario);
         } else if (opcion == "6") {
             // Implementar ayuda
-            cout << "Ayuda no implementada." << endl;
+                // Mostrar mensaje de ayuda
+                cout << "Bienvenido al sistema de chat." << endl;
+                cout << endl;
+                cout << "Este proyecto está basado en el propuesto por Bob Dugan y Erik Véliz en 2006. Con este trabajo se reforzarán los conocimientos sobre procesos, threads, concurrencia y comunicación entre procesos. El objetivo es desarrollar una aplicación de chat en C/C++." << endl;
+                cout << endl;
+                cout << "La aplicación consta de dos partes:" << endl;
+                cout << "Servidor:" << endl;
+                cout << "- Mantiene una lista de todos los clientes/usuarios conectados al sistema." << endl;
+                cout << "- Sólo puede existir un servidor durante una ejecución del sistema de chat." << endl;
+                cout << "- Se ejecuta como un proceso independiente mediante el siguiente comando: <nombredelservidor> <puertodelservidor>." << endl;
+                cout << endl;
+                cout << "Cliente:" << endl;
+                cout << "- Se conecta y se registra con el servidor." << endl;
+                cout << "- Permite chatear con otros usuarios, cambiar de estado, listar usuarios conectados, obtener información de usuario en particular, recibir ayuda y salir del programa." << endl;
+                cout << "- Se ejecuta mediante el siguiente comando: <nombredelcliente> <nombredeusuario> <IPdelservidor> <puertodelservidor>." << endl;
+                cout << endl;
+                cout << "Opciones disponibles:" << endl;
+                cout << "1. Chatear con todos los usuarios (broadcasting): Permite enviar un mensaje que será recibido por todos los usuarios conectados al sistema de chat." << endl;
+                cout << "2. Enviar y recibir mensajes directos, privados, aparte del chat general: Permite enviar mensajes directamente a un usuario específico." << endl;
+                cout << "3. Cambiar de status: ACTIVO, OCUPADO, INACTIVO: Permite cambiar el estado de tu sesión en el chat. Esto puede afectar cómo otros usuarios te ven." << endl;
+                cout << "4. Listar los usuarios conectados al sistema de chat: Muestra una lista de todos los usuarios que están actualmente conectados al sistema de chat." << endl;
+                cout << "5. Desplegar información de un usuario en particular: Permite obtener información detallada de un usuario específico, como su dirección IP." << endl;
+                cout << "6. Ayuda: Muestra este mensaje de ayuda detallada sobre todas las opciones disponibles en el sistema de chat." << endl;
+                cout << "7. Salir: Cierra la aplicación de chat y termina la conexión con el servidor." << endl;
+                cout << endl;
+                cout << "Para chatear con usuarios, el formato debe ser similar a lo siguiente: <usuario> <mensaje>." << endl;
+                cout << endl;
+                cout << "Recuerda que el servidor se ejecuta como un proceso independiente y debe estar activo para que los clientes se conecten y puedan comunicarse." << endl;
+                cout << endl;
+                cout << "¡Disfruta chateando!" << endl;
+                cout << endl;
+                cout << "Para chatear con usuarios, el formato debe ser similar a lo siguiente: <usuario> <mensaje>." << endl;
+                cout << endl;
+                cout << "Recuerda que el servidor se ejecuta como un proceso independiente y debe estar activo para que los clientes se conecten y puedan comunicarse." << endl;
+                cout << endl;
+                cout << "¡Disfruta chateando!" << endl;
         } else if (opcion == "7") {
             // Implementar salida
             break;
