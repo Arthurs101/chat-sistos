@@ -65,23 +65,12 @@ void listenResponses(int sockfd){
             switch (respuesta->option())
             {
             case 2: //usarios conectados
-                if(respuesta->has_connectedusers()){
                 cout<<"---------------Retriieved Users:---------------"<<endl;
                 for (int i = 0; i < respuesta->connectedusers().connectedusers_size(); ++i) {
                     auto user = respuesta->connectedusers().connectedusers(i);
                     cout<< "User: " << user.username()<<endl;
                 }
                 cout <<"-----------------------------------------------"<<endl ;
-                }else{//usuario en particular
-                    cout<<"---------------USER INFO RETRIEVED:---------------"<<endl;
-                    cout<<"USER: ";
-                    cout<<respuesta->userinforesponse().username();
-                    cout<<"\nSTATUS: ";
-                    cout<<respuesta->userinforesponse().status();
-                    cout<<"\nIP: ";
-                    cout<<respuesta->userinforesponse().ip()<<endl;
-                    cout<<"---------------END OF RETRIEVED-------------------"<<endl;
-                }
                 break;
             case 3:
                 cout<<"---------------STATUS CHANGE:---------------"<<endl;
@@ -104,6 +93,16 @@ void listenResponses(int sockfd){
                 //crear el thread para la transmision privada
                 privates[respuesta->messagecommunication().sender()] = thread(listenPrivateMessages,sockfd,respuesta->messagecommunication().sender());
             }
+            break;
+            case 5:
+                    cout<<"---------------USER INFO RETRIEVED:---------------"<<endl;
+                    cout<<"USER: ";
+                    cout<<respuesta->userinforesponse().username();
+                    cout<<"\nSTATUS: ";
+                    cout<<respuesta->userinforesponse().status();
+                    cout<<"\nIP: ";
+                    cout<<respuesta->userinforesponse().ip()<<endl;
+                    cout<<"---------------END OF RETRIEVED-------------------"<<endl;
             break;
             default:
                 cout<<"RECEIVED UNKNOWN RESPONSE OF SERVER"<<endl;

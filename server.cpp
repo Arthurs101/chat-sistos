@@ -2,6 +2,7 @@
 *Arturo Argueta 21527
 *Daniel EStrada 
 */
+#include <chrono>
 #include <iostream>
 #include <netinet/in.h>
 #include <stdio.h>
@@ -23,6 +24,7 @@ struct Cli{
     string username;
     char ip[INET_ADDRSTRLEN]; //16 bits
     string status;
+    std::chrono::time_point<std::chrono::high_resolution_clock> lastActivityTime; // Nuevo campo para almacenar el tiempo de la última actividad
 };
 
 //all the clients en un "diccionario"
@@ -99,12 +101,22 @@ void *requestsHandler(void *params){
 				client.status = "activo";
 				strcpy(client.ip, newClient->ip);
 				servingCLients[client.username] = &client;
+                servingCLients[client.username]->lastActivityTime = std::chrono::high_resolution_clock::now();
+                servingCLients[client.username]->status = "activo";
 				break;
 			}
             case 2:{ //ask for all users
+                servingCLients[client.username]->lastActivityTime = std::chrono::high_resolution_clock::now();
+                servingCLients[client.username]->status = "activo";
                 if(request->users().user()!= "" || !request->users().has_user()){ //empty or it has no parameter
                     chat::ConnectedUsersResponse *users = new chat::ConnectedUsersResponse();
+                    auto currentTime = std::chrono::high_resolution_clock::now();
                     for(auto i:servingCLients){
+                    auto elapsedTime = std::chrono::duration_cast<std::chrono::seconds>(currentTime - servingCLients[client.username]->lastActivityTime);
+                    if (elapsedTime.count() >= 5) {
+                    // Cambiar el estado del cliente a "inactivo"
+                            servingCLients[client.username]->status = "inactivo";
+                    }
                         chat::UserInfo *user_in_pos = new chat::UserInfo();
                         user_in_pos->set_username(i.second->username);
                         user_in_pos->set_status(i.second->status);
@@ -127,7 +139,9 @@ void *requestsHandler(void *params){
 				break;
 			}
 			case 3:{ //change status
-                try{
+                servingCLients[client.username]->lastActivityTime = std::chrono::high_resolution_clock::now();
+                servingCLients[client.username]->status = "activo";
+                if (servingCLients.find(request->users().user()) != servingCLients.end()){
                 servingCLients[request->change().username()]->status = request->change().status();
                 std::cout<<"User: "<<client.username<<" status has changed successfully\n";
                 chat::ChangeStatus *sStatus = new chat::ChangeStatus();
@@ -141,12 +155,14 @@ void *requestsHandler(void *params){
                 strcpy(buffer, msgServer.c_str());
                 send(socket, buffer, msgServer.size() + 1, 0);
                 }
-                catch(exception &e){
+                else{
                     ErrorResponse(3,socket,"User:" + request->change().username() + "doesn't exist");
                 }
 				break;
 			}
 			case 4:{ //enviar mensaje
+                servingCLients[client.username]->lastActivityTime = std::chrono::high_resolution_clock::now();
+                servingCLients[client.username]->status = "activo";
                 if(!request->messagecommunication().has_recipient()||request->messagecommunication().recipient()=="everyone"){ //a chat global
                     std::cout<<"\n__SENDING GENERAL MESSAGE__\nUser: "<<request->messagecommunication().sender()<<" is trying to send a general message";
                     for (auto i:servingCLients){
@@ -174,6 +190,7 @@ void *requestsHandler(void *params){
                             response->SerializeToString(&msgServer);
                             strcpy(buffer, msgServer.c_str());
                             send(i.second->socket, buffer, msgServer.size() + 1, 0);
+                            
                         }
                     }
                 }
@@ -204,6 +221,8 @@ void *requestsHandler(void *params){
                         strcpy(buffer, msgServer.c_str());
                         send(socket, buffer, msgServer.size() + 1, 0);
                         std::cout<<"\nSUCCESS:User: "+request->messagecommunication().sender()+" has sent the message successfully ->"+request->messagecommunication().recipient()+"\n";
+                        servingCLients[client.username]->lastActivityTime = std::chrono::high_resolution_clock::now();
+                        servingCLients[client.username]->status = "activo";
                     }
                     else{ // no existe
                         ErrorResponse(4,socket,"ERROR: recipient doesn't exist" );
@@ -214,15 +233,24 @@ void *requestsHandler(void *params){
 			}
 			case 5:{ //obtener usuario en específico
 				chat::UserInfo *userI = new chat::UserInfo();
+                servingCLients[client.username]->lastActivityTime = std::chrono::high_resolution_clock::now();
+                servingCLients[client.username]->status = "activo";
                 if (servingCLients.find(request->users().user()) != servingCLients.end()){
                     //intentar obtener dicho valor con la llave (username)
+                    auto currentTime = std::chrono::high_resolution_clock::now();
+                    auto elapsedTime = std::chrono::duration_cast<std::chrono::seconds>(currentTime - servingCLients[request->users().user()]->lastActivityTime);
+                    if (elapsedTime.count() >= 5) {
+                    // Cambiar el estado del cliente a "inactivo"
+                    servingCLients[request->users().user()]->status = "inactivo";
+                    }
+                    cout<<"Delta time: "<<elapsedTime.count()<<"user: "<<request->users().user()<<endl;
                     userI->set_username(servingCLients[request->users().user()]->username);                    
                     userI->set_ip(servingCLients[request->users().user()]->ip);
                     userI->set_status(servingCLients[request->users().user()]->status);
                     response->set_allocated_userinforesponse(userI);
                     response->set_servermessage("SUCCESS: userinfo of "+request->users().user());
                     response->set_code(200);
-                    response->set_option(2);
+                    response->set_option(5);
                     response->SerializeToString(&msgServer);
                     strcpy(buffer, msgServer.c_str());
                     send(socket, buffer, msgServer.size() + 1, 0);
